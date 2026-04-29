@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bemistry Game With AI - Kelompok 4</title>
+    <style>
+        :root { --neon-blue: #38bdf8; --neon-purple: #a855f7; --neon-green: #22c55e; --dark-bg: #0f172a; --dark-card: #1e293b; }
+        body { background-color: var(--dark-bg); color: var(--neon-blue); font-family: 'Segoe UI', sans-serif; display: flex; margin: 0; height: 100vh; overflow: hidden; }
+        .watermark { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 999; color: rgba(148, 163, 184, 0.4); font-size: 13px; font-weight: bold; pointer-events: none; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1e293b 0%, #0f172a 100%); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; transition: 0.5s; }
+        .hidden { display: none !important; }
+        
+        .btn-main { width: 300px; padding: 18px; margin: 10px; border: 2px solid var(--neon-blue); background: transparent; color: var(--neon-blue); font-weight: bold; cursor: pointer; border-radius: 15px; font-size: 16px; transition: 0.3s; outline: none; }
+        .btn-main:hover { background: var(--neon-blue); color: var(--dark-bg); box-shadow: 0 0 20px var(--neon-blue); }
+        
+        .top-left-panel { position: fixed; top: 20px; left: 20px; z-index: 101; display: flex; gap: 8px; }
+        .panel-btn { padding: 10px 15px; background: rgba(30, 41, 59, 0.9); border: 1px solid var(--neon-blue); color: var(--neon-blue); border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        
+        /* GRID SPU FIX */
+        #game-container { flex: 2.8; padding: 10px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; }
+        .element-grid { 
+            display: grid; 
+            grid-template-columns: repeat(18, 45px); /* Lebar kolom tetap supaya presisi */
+            grid-template-rows: repeat(10, 45px);    /* Tinggi baris tetap */
+            gap: 4px; 
+            margin-top: 20px;
+            justify-content: center;
+        }
+        .element-box { 
+            width: 45px; height: 45px; 
+            border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.2);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            font-size: 10px; color: #64748b; background: rgba(30, 41, 59, 0.5); 
+        }
+        .glow-success { background: var(--neon-green) !important; color: var(--dark-bg) !important; font-weight: bold; box-shadow: 0 0 15px var(--neon-green); border-color: var(--neon-green) !important; }
+
+        #chat-container { flex: 1; background-color: var(--dark-card); border-left: 2px solid var(--neon-blue); display: flex; flex-direction: column; padding: 20px; }
+        #chat-history { flex-grow: 1; overflow-y: auto; margin-bottom: 15px; padding: 15px; background: var(--dark-bg); border-radius: 15px; border: 1px solid #334155; }
+        .chat-msg { margin-bottom: 12px; padding: 10px; border-radius: 10px; font-size: 14px; }
+        .ai-msg { background: rgba(168, 85, 247, 0.1); border-left: 4px solid var(--neon-purple); }
+        .user-msg { background: rgba(56, 189, 248, 0.1); border-right: 4px solid var(--neon-blue); text-align: right; }
+        
+        .control-btn { padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; margin-bottom: 8px; width: 100%; }
+        .modal-box { background: var(--dark-card); padding: 30px; border-radius: 20px; max-width: 450px; text-align: center; border: 2px solid var(--neon-blue); }
+        input#username-input { background: #1e293b; border: 2px solid var(--neon-purple); padding: 15px; border-radius: 10px; color: white; text-align: center; width: 80%; font-size: 18px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
+    <div class="watermark">Bemistry Game With AI Kelompok 4 - Mahasiswa Pendidikan Kimia 2024B</div>
+
+    <div class="top-left-panel">
+        <button id="music-toggle" class="panel-btn" onclick="toggleMusic()">🎵 MUSIC: OFF</button>
+        <button id="lvl-btn" class="panel-btn hidden" onclick="location.reload()">⚙️ GANTI LEVEL</button>
+        <button id="main-exit-btn" class="panel-btn hidden" style="border-color:#f43f5e; color:#f43f5e;" onclick="confirmExit()">❌ AKHIRI GAME</button>
+    </div>
+
+    <div id="screen-welcome" class="overlay">
+        <h1>Bemistry Game With AI 🧪</h1>
+        <button id="btn-start" class="btn-main" onclick="next('screen-welcome', 'screen-instr')">MULAI</button>
+    </div>
+
+    <div id="screen-instr" class="overlay hidden">
+        <h2>INSTRUKSI</h2>
+        <p style="max-width:400px; color:#94a3b8; line-height: 1.6;">Tanya AI tentang massa, nomor atom, atau sifat unsur. Tebak nama/simbol untuk menang!</p>
+        <button class="btn-main" onclick="next('screen-instr', 'screen-user')">MENGERTI</button>
+    </div>
+
+    <div id="screen-user" class="overlay hidden">
+        <h2>NAMA PENELITI</h2>
+        <input type="text" id="username-input" placeholder="Nama Anda..." autocomplete="off">
+        <button class="btn-main" onclick="saveUser()">SIMPAN</button>
+    </div>
+
+    <div id="screen-level" class="overlay hidden">
+        <h2>PILIH LEVEL</h2>
+        <button class="btn-main" onclick="setupGame(20)">Level 1 (1-20)</button>
+        <button class="btn-main" onclick="setupGame(54)">Level 2 (1-54)</button>
+        <button class="btn-main" onclick="setupGame(118)">Level 3 (1-118)</button>
+    </div>
+
+    <div id="pop-knowledge" class="overlay hidden" style="z-index: 600; background: rgba(15, 23, 42, 0.9);">
+        <div class="modal-box" style="border-color: var(--neon-green);">
+            <h2 style="color: var(--neon-green);">ANALISIS BERHASIL! ✅</h2>
+            <div id="knowledge-content" style="text-align: left; margin: 20px 0; color: #cbd5e1;"></div>
+            <button class="btn-main" style="border-color: var(--neon-green); color: var(--neon-green);" onclick="closeKnowledge()">LANJUT (ENTER)</button>
+        </div>
+    </div>
+
+    <div id="pop-exit" class="overlay hidden" style="z-index: 500; background: rgba(15, 23, 42, 0.95);">
+        <div class="modal-box" style="border-color: #f43f5e;">
+            <h2 style="color: #f43f5e;">PENGHANCURAN DATA! 🚨</h2>
+            <p>Yakin ingin menyerah? Semua progres analisis SPU akan dihapus dari sistem!</p>
+            <button class="btn-main" style="border-color: #f43f5e; color: #f43f5e; width: 100%;" onclick="location.reload()">YA, KELUAR</button>
+            <button class="btn-main" style="width: 100%;" onclick="closeExit()">BATAL</button>
+        </div>
+    </div>
+
+    <div id="screen-gameover" class="overlay hidden">
+        <h1 style="color: #f43f5e;">GAME OVER</h1>
+        <p id="final-score-text" style="font-size: 20px;"></p>
+        <button class="btn-main" onclick="location.reload()">MENU UTAMA</button>
+    </div>
+
+    <div id="game-container">
+        <div class="status-bar" style="margin-top: 60px; background: rgba(30, 41, 59, 0.8); padding: 10px 30px; border-radius: 30px; border: 1px solid var(--neon-purple); display: flex; gap: 30px;">
+            <span>❤️ <span id="life-count">3</span></span>
+            <span>🏆 <span id="score-count">0</span></span>
+        </div>
+        <div class="element-grid" id="spu-board"></div>
+    </div>
+
+    <div id="chat-container">
+        <div id="chat-history"></div>
+        <button id="audio-toggle" class="control-btn" style="background:var(--neon-purple); color:white;" onclick="toggleAISuara()">🔊 SUARA AI: ON</button>
+        <button id="mic-btn" class="control-btn" style="background:#f43f5e; color:white;" onclick="startSpeechRec()">🎤 MIC</button>
+        <input type="text" id="user-input" style="width:100%; padding:12px; background:#334155; color:white; border:none; border-radius:10px; margin-bottom:8px;" placeholder="Tanya ciri / tebak nama...">
+        <button id="btn-analisis" onclick="kirimPesan()" style="width:100%; background:var(--neon-blue); padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">ANALISIS (ENTER)</button>
+    </div>
+
+    <script>
+        let currentScreen = 'welcome';
+        let userName = "", target = null, lives = 3, score = 0;
+        let musicPlaying = false, isAISpeaking = true, currentMax = 20, elementQueue = [];
+
+        const chemicalDB = [
+            {n:1, s:"H", nm:"hidrogen", m:1.008, g:1, p:1, d:"Unsur paling melimpah di alam semesta."},
+            {n:2, s:"He", nm:"helium", m:4.002, g:18, p:1, d:"Gas mulia teringan, pengisi balon."},
+            {n:3, s:"Li", nm:"litium", m:6.94, g:1, p:2, d:"Logam padat teringan, bahan baterai ponsel."},
+            {n:4, s:"Be", nm:"berilium", m:9.01, g:2, p:2, d:"Logam abu-abu yang kuat dan ringan."},
+            {n:6, s:"C", nm:"karbon", m:12.01, g:14, p:2, d:"Unsur dasar kehidupan, penyusun intan."},
+            {n:7, s:"N", nm:"nitrogen", m:14.0, g:15, p:2, d:"Penyusun 78% atmosfer Bumi."},
+            {n:8, s:"O", nm:"oksigen", m:15.9, g:16, p:2, d:"Sangat penting untuk respirasi makhluk hidup."},
+            {n:11, s:"Na", nm:"natrium", m:22.9, g:1, p:3, d:"Logam reaktif yang ada dalam garam dapur."},
+            {n:26, s:"Fe", nm:"besi", m:55.8, g:8, p:4, d:"Logam transisi utama untuk konstruksi baja."},
+            {n:79, s:"Au", nm:"emas", m:196, g:11, p:6, d:"Logam mulia berharga yang sangat stabil."}
+        ];
+
+        // FUNGSI KOORDINAT SPU AKURAT
+        function getPos(n) {
+            // Baris 1
+            if (n === 1) return [1, 1];
+            if (n === 2) return [18, 1];
+            // Baris 2 & 3
+            if (n >= 3 && n <= 4) return [n - 2, 2];
+            if (n >= 5 && n <= 10) return [n + 8, 2];
+            if (n >= 11 && n <= 12) return [n - 10, 3];
+            if (n >= 13 && n <= 18) return [n, 3];
+            // Baris 4 & 5
+            if (n >= 19 && n <= 36) return [n - 18, 4];
+            if (n >= 37 && n <= 54) return [n - 36, 5];
+            // Baris 6 & 7 (Dengan gap f-block)
+            if (n >= 55 && n <= 56) return [n - 54, 6];
+            if (n >= 72 && n <= 86) return [n - 68, 6];
+            if (n >= 87 && n <= 88) return [n - 86, 7];
+            if (n >= 104 && n <= 118) return [n - 100, 7];
+            // Deret Lantanida (di bawah)
+            if (n >= 57 && n <= 71) return [n - 53, 9];
+            // Deret Aktinida (di bawah)
+            if (n >= 89 && n <= 103) return [n - 85, 10];
+            return [1, 1];
+        }
+
+        function renderBoard(max) {
+            const b = document.getElementById('spu-board'); b.innerHTML = '';
+            for(let i=1; i<=118; i++){
+                const [col, row] = getPos(i);
+                const d = document.createElement('div');
+                d.className = 'element-box'; d.id = `el-${i}`;
+                d.style.gridColumn = col; d.style.gridRow = row;
+                d.innerHTML = i;
+                if(i > max) d.style.opacity = '0.1';
+                b.appendChild(d);
+            }
+        }
+
+        function pickTarget() {
+            if(elementQueue.length === 0) {
+                elementQueue = chemicalDB.filter(x => x.n <= currentMax).sort(() => Math.random() - 0.5);
+            }
+            target = elementQueue.pop();
+            aiSpeak(`Data unsur baru terenkripsi. Silakan analisis ciri-cirinya.`);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if(currentScreen === 'welcome' || currentScreen === 'instr') next('screen-' + currentScreen, 'screen-user');
+                else if(currentScreen === 'knowledge') closeKnowledge();
+                else if(currentScreen === 'game') kirimPesan();
+            }
+        });
+
+        function next(curr, nxt) {
+            document.getElementById(curr).classList.add('hidden');
+            document.getElementById(nxt).classList.remove('hidden');
+            currentScreen = nxt.split('-')[1];
+        }
+
+        function saveUser() {
+            userName = document.getElementById('username-input').value || "Peneliti";
+            next('screen-user', 'screen-level');
+        }
+
+        function setupGame(max) {
+            currentMax = max;
+            document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+            document.getElementById('lvl-btn').classList.remove('hidden');
+            document.getElementById('main-exit-btn').classList.remove('hidden');
+            currentScreen = 'game'; lives = 3; score = 0;
+            updateUI(); renderBoard(max); pickTarget();
+        }
+
+        function kirimPesan() {
+            const i = document.getElementById('user-input');
+            const val = i.value.trim().toLowerCase();
+            if(!val) return;
+            document.getElementById('chat-history').innerHTML += `<div class="chat-msg user-msg">${val}</div>`;
+            i.value = '';
+
+            if(val.includes("massa")) aiSpeak(`Massanya sekitar ${target.m} u.`);
+            else if(val.includes("nomor")) aiSpeak(`Nomor atomnya adalah ${target.n}.`);
+            else if(val.includes("golongan")) aiSpeak(`Berada di golongan ${target.g}.`);
+            else if(val.includes("ciri") || val.includes("sifat")) aiSpeak(target.d);
+            else if(val === target.nm || val === target.s.toLowerCase()) {
+                score += 100; updateUI(); showKnowledge();
+            } else {
+                lives--; updateUI();
+                if(lives <= 0) showGameOver();
+                else aiSpeak(`Analisis salah. Data tidak sinkron.`);
+            }
+        }
+
+        function aiSpeak(txt) {
+            const h = document.getElementById('chat-history');
+            h.innerHTML += `<div class="chat-msg ai-msg"><b>AI:</b> ${txt}</div>`;
+            h.scrollTop = h.scrollHeight;
+            if(isAISpeaking) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(txt); u.lang = 'id-ID'; window.speechSynthesis.speak(u);
+            }
+        }
+
+        function showKnowledge() {
+            currentScreen = 'knowledge';
+            const box = document.getElementById(`el-${target.n}`);
+            box.classList.add('glow-success');
+            box.innerHTML = `<b>${target.s}</b>`;
+            document.getElementById('knowledge-content').innerHTML = `
+                <p><b>Unsur:</b> ${target.nm.toUpperCase()}</p>
+                <p><b>Simbol:</b> ${target.s} | <b>Massa:</b> ${target.m}</p>
+                <p><i>"${target.d}"</i></p>
+            `;
+            document.getElementById('pop-knowledge').classList.remove('hidden');
+        }
+
+        function closeKnowledge() {
+            document.getElementById('pop-knowledge').classList.add('hidden');
+            currentScreen = 'game'; pickTarget();
+        }
+
+        function updateUI() {
+            document.getElementById('life-count').innerText = lives;
+            document.getElementById('score-count').innerText = score;
+        }
+
+        function showGameOver() {
+            currentScreen = 'gameover';
+            document.getElementById('final-score-text').innerText = `${userName}, Skor Akhir: ${score}`;
+            document.getElementById('screen-gameover').classList.remove('hidden');
+        }
+
+        function toggleMusic() {
+            const m = document.getElementById('bg-music');
+            musicPlaying ? m.pause() : m.play(); musicPlaying = !musicPlaying;
+            document.getElementById('music-toggle').innerText = musicPlaying ? "🎵 MUSIC: ON" : "🎵 MUSIC: OFF";
+        }
+        function toggleAISuara() { 
+            isAISpeaking = !isAISpeaking; 
+            document.getElementById('audio-toggle').innerText = isAISpeaking ? "🔊 SUARA AI: ON" : "🔇 SUARA AI: OFF";
+        }
+        function confirmExit() { document.getElementById('pop-exit').classList.remove('hidden'); }
+        function closeExit() { document.getElementById('pop-exit').classList.add('hidden'); }
+        function startSpeechRec() {
+            const Speech = window.webkitSpeechRecognition;
+            if(!Speech) return;
+            const rec = new Speech(); rec.lang = 'id-ID';
+            rec.onresult = (e) => { document.getElementById('user-input').value = e.results[0][0].transcript; kirimPesan(); };
+            rec.start();
+        }
+    </script>
+</body>
+</html>
